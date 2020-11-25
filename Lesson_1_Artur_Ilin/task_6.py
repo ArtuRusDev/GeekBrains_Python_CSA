@@ -24,4 +24,5 @@
 НАРУШЕНИЕ обозначенных условий - задание не выполнено!!!
 """
 
-print('Не успел')
+with open('test_file.txt', mode='r', encoding='utf-8') as file:
+    print(file.read())
