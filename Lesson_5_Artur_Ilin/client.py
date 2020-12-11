@@ -1,14 +1,16 @@
 import json
 import sys
 import time
-
 from socket import AF_INET, socket, SOCK_STREAM
 from common.vars import *
 from common.utils import get_message, send_message
+import log.client_log_config
+
+CLIENT_LOGGER = logging.getLogger('client')
 
 
 def create_presence(user_name='Guest'):
-    return {
+    response = {
         ACTION: PRESENCE,
         TIME: time.time(),
         USER: {
@@ -16,12 +18,19 @@ def create_presence(user_name='Guest'):
         }
     }
 
+    CLIENT_LOGGER.debug(f'Сформировано сообщение {response} клиенту {response[USER][ACCOUNT_NAME]}')
+    return response
+
 
 def parse_response(message):
+    CLIENT_LOGGER.debug(f'Разбор сообщения от клиента {message}')
+
     if RESPONSE in message:
         if message[RESPONSE] == 200:
             return '200 : OK'
         return f'400 : {message[ERROR]}'
+
+    CLIENT_LOGGER.error(f'Некорректное сообщение от клиента')
     raise ValueError
 
 
@@ -32,7 +41,9 @@ def main():
         port = int(sys.argv[2])
 
         if 65535 < port < 1024:
-            raise ValueError
+            CLIENT_LOGGER.error(f'Укзан недопустимый адрес порта - {port}.'
+                                   f'Порт может быть в диапазоне от 1024 до 65535')
+            sys.exit(1)
     except IndexError:
         port = DEFAULT_PORT
         address = DEFAULT_IP_ADDRESS
@@ -42,15 +53,18 @@ def main():
 
     CLIENT_SOCK = socket(AF_INET, SOCK_STREAM)
     CLIENT_SOCK.connect((address, port))
+    CLIENT_LOGGER.debug(f'Установлено соединение с клиентном {address}')
 
     presence_message = create_presence()
     send_message(CLIENT_SOCK, presence_message)
+    CLIENT_LOGGER.debug(f'Отправлено сообщение клиенту {presence_message}')
 
     try:
         response = parse_response(get_message(CLIENT_SOCK))
-        print(response)
+        CLIENT_LOGGER.debug(f'Получено сообщение от клиента - {response}')
+
     except (ValueError, json.JSONDecodeError):
-        print('Bad request')
+        CLIENT_LOGGER.debug(f'Некорректный запрос от клиента')
 
 
 if __name__ == '__main__':
