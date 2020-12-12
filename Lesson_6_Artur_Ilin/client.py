@@ -1,14 +1,16 @@
 import json
 import sys
 import time
+import log.client_log_config
+from decos import log, Log
 from socket import AF_INET, socket, SOCK_STREAM
 from common.vars import *
 from common.utils import get_message, send_message
-import log.client_log_config
 
 CLIENT_LOGGER = logging.getLogger('client')
 
 
+@Log()
 def create_presence(user_name='Guest'):
     response = {
         ACTION: PRESENCE,
@@ -42,7 +44,7 @@ def main():
 
         if 65535 < port < 1024:
             CLIENT_LOGGER.error(f'Укзан недопустимый адрес порта - {port}.'
-                                   f'Порт может быть в диапазоне от 1024 до 65535')
+                                f'Порт может быть в диапазоне от 1024 до 65535')
             sys.exit(1)
     except IndexError:
         port = DEFAULT_PORT

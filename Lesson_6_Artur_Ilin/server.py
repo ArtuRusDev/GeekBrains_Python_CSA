@@ -1,5 +1,6 @@
 import json
 import sys
+from decos import log, Log
 from socket import AF_INET, socket, SOCK_STREAM
 from common.vars import *
 from common.utils import get_message, send_message
@@ -8,10 +9,10 @@ import log.server_log_config
 SERVER_LOGGER = logging.getLogger('server')
 
 
+@Log()
 def get_response_for_message(message):
     if ACTION in message and message[ACTION] == PRESENCE and \
             TIME in message and USER in message and message[USER][ACCOUNT_NAME] == 'Guest':
-
         SERVER_LOGGER.debug(f'Получено сообщение {message} от клиента {message[USER][ACCOUNT_NAME]}')
         response = {RESPONSE: 200}
 
