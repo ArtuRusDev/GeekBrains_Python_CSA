@@ -1,79 +1,106 @@
-import json
+import argparse
 import sys
-from decos import log, Log
+import time
+from select import select
+
+from decos import Log
 from socket import AF_INET, socket, SOCK_STREAM
 from common.vars import *
 from common.utils import get_message, send_message
-import log.server_log_config
 
 SERVER_LOGGER = logging.getLogger('server')
 
 
 @Log()
-def get_response_for_message(message):
-    if ACTION in message and message[ACTION] == PRESENCE and \
-            TIME in message and USER in message and message[USER][ACCOUNT_NAME] == 'Guest':
-        SERVER_LOGGER.debug(f'Получено сообщение {message} от клиента {message[USER][ACCOUNT_NAME]}')
-        response = {RESPONSE: 200}
+def get_response_for_message(message, msg_list, client):
+    SERVER_LOGGER.debug(f'Разбор сообщения от клиента : {message}')
 
-        SERVER_LOGGER.debug(f'Отправлен ответ {response} клиенту {message[USER][ACCOUNT_NAME]}')
-        return response
+    if ACTION in message and message[ACTION] == PRESENCE and TIME in message and USER in message and message[USER][
+        ACCOUNT_NAME] == 'Guest':
+        send_message(client, {RESPONSE: 200})
+        return
 
-    SERVER_LOGGER.error(f'Получены некоретные данные от клиента - {message}.')
-    response = {RESPONSE: 400, ERROR: 'Bad request'}
+    elif ACTION in message and message[ACTION] == MESSAGE and TIME in message and MESSAGE_TEXT in message:
+        msg_list.append((message[ACCOUNT_NAME], message[MESSAGE_TEXT]))
+        return
 
-    SERVER_LOGGER.debug(f'Отправлен ответ {response} клиенту')
-    return response
+    else:
+        send_message(client, {
+            RESPONSE: 400,
+            ERROR: 'Bad Request'
+        })
+        return
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('addr', default=DEFAULT_IP_ADDRESS, nargs='?')
+    parser.add_argument('port', default=DEFAULT_PORT, type=int, nargs='?')
+    namespace = parser.parse_args(sys.argv[1:])
+    serv_address = namespace.addr
+    serv_port = namespace.port
+
+    if 65535 < serv_port < 1024:
+        SERVER_LOGGER.critical(f'Укзан недопустимый адрес порта - {serv_port}.'
+                               f'Порт может быть в диапазоне от 1024 до 65535')
+        sys.exit(1)
+
+    return serv_address, serv_port
 
 
 def main():
-    try:
-        if '-p' in sys.argv:
-            port = int(sys.argv[sys.argv.index('-p') + 1])
-        else:
-            port = DEFAULT_PORT
-        if 65535 < port < 1024:
-            SERVER_LOGGER.critical(f'Укзан недопустимый адрес порта - {port}.'
-                                   f'Порт может быть в диапазоне от 1024 до 65535')
-            sys.exit(1)
-    except IndexError:
-        SERVER_LOGGER.critical(f'Не указан порт. Соединение не удалось')
-        sys.exit(1)
-    except ValueError:
-        SERVER_LOGGER.critical(f'Порт может быть только в диапазоне от 1024 до 65535. '
-                               f'Соединение не удалось')
-        sys.exit(1)
+    address, port = parse_args()
 
-    try:
-        if '-a' in sys.argv:
-            address = int(sys.argv[sys.argv.index('-a') + 1])
-        else:
-            address = ''
-    except IndexError:
-        print('Неообходимо указать адрес после "-p".')
-        sys.exit(1)
+    SERVER_LOGGER.info(f'Запущен сервер. Данные сервера: адрес - {address}, порт - {port}')
 
-    SERV_SOCK = socket(AF_INET, SOCK_STREAM)
+    sock = socket(AF_INET, SOCK_STREAM)
+    sock.bind((address, port))
+    sock.listen(MAX_CONNECTIONS)
+    sock.settimeout(0.5)
 
-    SERV_SOCK.bind((address, port))
-
-    SERV_SOCK.listen(MAX_CONNECTIONS)
+    clients = []
+    messages = []
 
     while True:
-        CLIENT_SOCK, ADDR = SERV_SOCK.accept()
-        SERVER_LOGGER.info(f'Установлено соединение с клиетном: {ADDR}')
         try:
-            client_message = get_message(CLIENT_SOCK)
-            SERVER_LOGGER.info(f'Получено сообщение от клиента: {client_message}')
-            response = get_response_for_message(client_message)
-            SERVER_LOGGER.debug(f'Сформирован ответ клиенту: {response}')
-            send_message(CLIENT_SOCK, response)
-            SERVER_LOGGER.info(f'Отправлено сообщение {response} клиенту {ADDR}')
-            CLIENT_SOCK.close()
-            SERVER_LOGGER.info(f'Соединение с клиентом разорвано')
-        except (ValueError, json.JSONDecodeError):
-            CLIENT_SOCK.close()
-            SERVER_LOGGER.error(f'Получены некоретные данные от клиента {ADDR}. Соединение разорвано')
+            conn, address = sock.accept()
+        except OSError:
+            pass
+        else:
+            print(f'Получен запрос на соединение с {str(address)}')
+            clients.append(conn)
+
+        recv_data = []
+        send_data = []
+        err_list = []
+
+        try:
+            if clients:
+                recv_data, send_data, err_list = select(clients, clients, [], 0)
+        except OSError:
+            pass
+
+        if recv_data:
+            for client in recv_data:
+                try:
+                    get_response_for_message(get_message(client), messages, client)
+                except:
+                    SERVER_LOGGER.info(f'Клиент {client} отключился')
+                    clients.remove(client)
+        if messages and send_data:
+            message = {
+                ACTION: MESSAGE,
+                SENDER: messages[0][0],
+                TIME: time.time(),
+                MESSAGE_TEXT: messages[0][1]
+            }
+            del messages[0]
+            for wait_client in send_data:
+                try:
+                    send_message(wait_client, message)
+                except:
+                    SERVER_LOGGER.info(f'Клиент {wait_client} отключился')
+                    clients.remove(wait_client)
 
 
 if __name__ == '__main__':
