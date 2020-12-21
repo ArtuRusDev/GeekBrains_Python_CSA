@@ -1,7 +1,7 @@
 from client import parse_response, create_presence
 import unittest
 
-from common.vars import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, RESPONSE, ERROR
+from common.variables import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, RESPONSE, ERROR
 
 
 class TestClient(unittest.TestCase):

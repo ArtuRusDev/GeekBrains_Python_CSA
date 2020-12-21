@@ -1,7 +1,5 @@
 import sys
 import logging.handlers
-import log.client_log_config
-import log.server_log_config
 import inspect
 
 if 'client' in sys.argv[0]:

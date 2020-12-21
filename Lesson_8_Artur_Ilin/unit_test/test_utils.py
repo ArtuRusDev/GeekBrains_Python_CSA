@@ -1,7 +1,7 @@
 import json
 import unittest
 from common.utils import get_message, send_message
-from common.vars import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, RESPONSE, ERROR
+from common.variables import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, RESPONSE, ERROR
 
 
 class Socket:

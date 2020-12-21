@@ -1,10 +1,10 @@
 import json
-from common.vars import *
+from common.variables import *
 
 
 def get_message(client_sock):
     response_bytes = client_sock.recv(MAX_PACKAGE_LENGTH)
-    print(response_bytes)
+
     if isinstance(response_bytes, bytes):
         response_json = response_bytes.decode(ENCODING)
         response = json.loads(response_json)

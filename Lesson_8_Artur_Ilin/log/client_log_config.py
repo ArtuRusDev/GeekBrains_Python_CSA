@@ -1,7 +1,7 @@
 import logging.handlers
 import os
 import sys
-from common.vars import LOGGING_LEVEL
+from common.variables import LOGGING_LEVEL
 
 
 DIR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
